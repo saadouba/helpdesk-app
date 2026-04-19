@@ -37,6 +37,11 @@ function App() {
     return tickets.filter((ticket) => ticket.status === statusFilter)
   }, [statusFilter, tickets])
 
+  const openCount = useMemo(
+    () => tickets.filter((t) => t.status === 'Open').length,
+    [tickets]
+  )
+
   const handleFieldChange = (event) => {
     const { name, value } = event.target
     setFormData((current) => ({ ...current, [name]: value }))
@@ -135,161 +140,217 @@ function App() {
   }
 
   return (
-    <main className="helpdesk-layout">
-      <header className="page-header">
-        <h1>IT Helpdesk Ticket System</h1>
-        <p>Submit support requests and track progress across your queue.</p>
-      </header>
+    <main className="it-dashboard">
+      <div className="it-dashboard__ambient" aria-hidden="true" />
 
-      <section className="card">
-        <h2>Create Ticket</h2>
-        <form className="ticket-form" onSubmit={handleSubmit}>
-          <label>
-            Name
-            <input
-              required
-              name="name"
-              value={formData.name}
-              onChange={handleFieldChange}
-              placeholder="Alex Johnson"
-            />
-          </label>
-
-          <label>
-            Email
-            <input
-              required
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleFieldChange}
-              placeholder="alex@company.com"
-            />
-          </label>
-
-          <label>
-            Category
-            <select
-              name="category"
-              value={formData.category}
-              onChange={handleFieldChange}
-            >
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Priority
-            <select
-              name="priority"
-              value={formData.priority}
-              onChange={handleFieldChange}
-            >
-              {priorities.map((priority) => (
-                <option key={priority} value={priority}>
-                  {priority}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="full-width">
-            Subject
-            <input
-              required
-              name="subject"
-              value={formData.subject}
-              onChange={handleFieldChange}
-              placeholder="Cannot connect to VPN"
-            />
-          </label>
-
-          <label className="full-width">
-            Description
-            <textarea
-              required
-              name="description"
-              value={formData.description}
-              onChange={handleFieldChange}
-              onBlur={(event) => {
-                void suggestPriorityFromDescription(event.target.value)
-              }}
-              rows={4}
-              placeholder="Provide details, error messages, and steps already tried."
-            />
-          </label>
-
-          <button type="submit" className="submit-btn">
-            Submit Ticket
-          </button>
-        </form>
-      </section>
-
-      <section className="card">
-        <div className="queue-header">
-          <h2>Ticket Queue</h2>
-          <div className="filter-group" role="group" aria-label="Filter by status">
-            {statuses.map((status) => (
-              <button
-                key={status}
-                type="button"
-                className={statusFilter === status ? 'filter active' : 'filter'}
-                onClick={() => setStatusFilter(status)}
-              >
-                {status}
-              </button>
-            ))}
+      <header className="it-dashboard__hero">
+        <div className="it-dashboard__hero-main">
+          <div className="it-dashboard__brand">
+            <span className="it-dashboard__brand-mark" aria-hidden="true" />
+            <div>
+              <p className="it-dashboard__eyebrow">Enterprise IT Operations</p>
+              <h1 className="it-dashboard__title">Service Desk Console</h1>
+              <p className="it-dashboard__subtitle">
+                Submit support requests, triage by status, and keep your queue under control in one
+                view.
+              </p>
+            </div>
           </div>
         </div>
 
-        {visibleTickets.length === 0 ? (
-          <p className="empty-state">No tickets found for this filter.</p>
-        ) : (
-          <ul className="ticket-list">
-            {visibleTickets.map((ticket) => (
-              <li key={ticket.id} className="ticket-item">
-                <div className="ticket-top">
-                  <span className="ticket-id">{ticket.id}</span>
-                  <span className={`pill priority-${ticket.priority.toLowerCase()}`}>
-                    {ticket.priority}
-                  </span>
-                </div>
-                <h3>{ticket.subject}</h3>
-                <p>{ticket.description}</p>
-                <div className="ticket-meta">
-                  <span>{ticket.name}</span>
-                  <span>{ticket.email}</span>
-                  <span>{ticket.category}</span>
-                  <span>{ticket.createdAt}</span>
-                </div>
-                <div className="status-row">
-                  <label>
-                    Status
-                    <select
-                      value={ticket.status}
-                      onChange={(event) =>
-                        updateTicketStatus(ticket.id, event.target.value)
-                      }
-                    >
-                      {statuses
-                        .filter((status) => status !== 'All')
-                        .map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        <div className="it-dashboard__stats" role="region" aria-label="Queue summary">
+          <article className="it-stat it-stat--enter">
+            <span className="it-stat__label">Total tickets</span>
+            <span className="it-stat__value">{tickets.length}</span>
+            <span className="it-stat__hint">This session</span>
+          </article>
+          <article className="it-stat it-stat--enter it-stat--delay-1">
+            <span className="it-stat__label">Open</span>
+            <span className="it-stat__value">{openCount}</span>
+            <span className="it-stat__hint">Awaiting action</span>
+          </article>
+          <article className="it-stat it-stat--enter it-stat--delay-2">
+            <span className="it-stat__label">In view</span>
+            <span className="it-stat__value">{visibleTickets.length}</span>
+            <span className="it-stat__hint">
+              Filter: <strong>{statusFilter}</strong>
+            </span>
+          </article>
+        </div>
+      </header>
+
+      <div className="it-dashboard__grid">
+        <section className="it-panel it-panel--form card">
+          <div className="it-panel__head">
+            <h2 className="it-panel__title">New ticket</h2>
+            <p className="it-panel__desc">
+              Capture requester details and context. Priority can be suggested when you leave the
+              description field.
+            </p>
+          </div>
+
+          <form className="ticket-form" onSubmit={handleSubmit}>
+            <label>
+              <span className="field-label">Requester name</span>
+              <input
+                required
+                name="name"
+                value={formData.name}
+                onChange={handleFieldChange}
+                placeholder="Alex Johnson"
+              />
+            </label>
+
+            <label>
+              <span className="field-label">Work email</span>
+              <input
+                required
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleFieldChange}
+                placeholder="alex@company.com"
+              />
+            </label>
+
+            <label>
+              <span className="field-label">Category</span>
+              <select name="category" value={formData.category} onChange={handleFieldChange}>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span className="field-label">Priority</span>
+              <select name="priority" value={formData.priority} onChange={handleFieldChange}>
+                {priorities.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {priority}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="full-width">
+              <span className="field-label">Subject</span>
+              <input
+                required
+                name="subject"
+                value={formData.subject}
+                onChange={handleFieldChange}
+                placeholder="Cannot connect to VPN"
+              />
+            </label>
+
+            <label className="full-width">
+              <span className="field-label">Description</span>
+              <textarea
+                required
+                name="description"
+                value={formData.description}
+                onChange={handleFieldChange}
+                onBlur={(event) => {
+                  void suggestPriorityFromDescription(event.target.value)
+                }}
+                rows={4}
+                placeholder="Provide details, error messages, and steps already tried."
+              />
+            </label>
+
+            <button type="submit" className="submit-btn">
+              <span>Submit ticket</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M5 12h14m-4 4 4-4-4-4"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </form>
+        </section>
+
+        <section className="it-panel it-panel--queue card">
+          <div className="queue-header">
+            <div>
+              <h2 className="it-panel__title it-panel__title--inline">Live queue</h2>
+              <p className="it-panel__desc it-panel__desc--tight">
+                Filter by lifecycle status. Updates apply to this session immediately.
+              </p>
+            </div>
+            <div className="filter-group" role="group" aria-label="Filter by status">
+              {statuses.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  className={statusFilter === status ? 'filter active' : 'filter'}
+                  onClick={() => setStatusFilter(status)}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {visibleTickets.length === 0 ? (
+            <div className="empty-state" role="status">
+              <div className="empty-state__icon" aria-hidden="true" />
+              <p className="empty-state__text">No tickets match this filter.</p>
+              <p className="empty-state__sub">Submit a new ticket or choose a different status.</p>
+            </div>
+          ) : (
+            <ul className="ticket-list">
+              {visibleTickets.map((ticket, index) => (
+                <li
+                  key={ticket.id}
+                  className="ticket-item"
+                  style={{ animationDelay: `${Math.min(index, 8) * 0.05}s` }}
+                >
+                  <div className="ticket-top">
+                    <span className="ticket-id">{ticket.id}</span>
+                    <span className={`pill priority-${ticket.priority.toLowerCase()}`}>
+                      {ticket.priority}
+                    </span>
+                  </div>
+                  <h3>{ticket.subject}</h3>
+                  <p className="ticket-body">{ticket.description}</p>
+                  <div className="ticket-meta">
+                    <span className="ticket-chip">{ticket.name}</span>
+                    <span className="ticket-chip ticket-chip--mono">{ticket.email}</span>
+                    <span className="ticket-chip">{ticket.category}</span>
+                    <span className="ticket-chip ticket-chip--muted">{ticket.createdAt}</span>
+                  </div>
+                  <div className="status-row">
+                    <label>
+                      <span className="field-label">Status</span>
+                      <select
+                        value={ticket.status}
+                        onChange={(event) =>
+                          updateTicketStatus(ticket.id, event.target.value)
+                        }
+                      >
+                        {statuses
+                          .filter((status) => status !== 'All')
+                          .map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </main>
   )
 }
