@@ -1,9 +1,20 @@
 import { useMemo, useState } from 'react'
 import './App.css'
+import supabase from './supabaseClient'
 
 const categories = ['Hardware', 'Software', 'Network', 'Access', 'Other']
 const priorities = ['Low', 'Medium', 'High', 'Critical']
 const statuses = ['All', 'Open', 'In Progress', 'Resolved']
+
+/** Extract Low | Medium | High | Critical from model text (order: longest label first). */
+function parsePriorityFromModelReply(text) {
+  if (!text || typeof text !== 'string') return null
+  const cleaned = text.replace(/[*#`"']/g, ' ')
+  for (const p of ['Critical', 'High', 'Medium', 'Low']) {
+    if (new RegExp(`\\b${p}\\b`, 'i').test(cleaned)) return p
+  }
+  return null
+}
 
 const createInitialForm = () => ({
   name: '',
@@ -31,23 +42,88 @@ function App() {
     setFormData((current) => ({ ...current, [name]: value }))
   }
 
+  async function suggestPriorityFromDescription(descriptionText) {
+    const trimmed = descriptionText.trim()
+    if (!trimmed) return
+
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY
+    if (!apiKey) {
+      console.warn('VITE_OPENROUTER_API_KEY is not set')
+      return
+    }
+
+    const userContent =
+      'Based on this IT ticket description, reply with only one word — Low, Medium, High, or Critical.\n\n' +
+      `Description:\n${trimmed}`
+
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'google/gemma-3-4b-it:free',
+          messages: [{ role: 'user', content: userContent }],
+        }),
+      })
+
+      if (!response.ok) {
+        const errBody = await response.text()
+        console.error('OpenRouter request failed:', response.status, errBody)
+        return
+      }
+
+      const data = await response.json()
+      const raw = data.choices?.[0]?.message?.content
+      const suggested = parsePriorityFromModelReply(String(raw ?? '').trim())
+
+      if (suggested && priorities.includes(suggested)) {
+        setFormData((current) => ({ ...current, priority: suggested }))
+      }
+    } catch (err) {
+      console.error('OpenRouter fetch failed:', err)
+    }
+  }
+
   const generateTicketId = () => {
     const randomPart = Math.floor(Math.random() * 900 + 100)
     return `HD-${Date.now().toString().slice(-6)}-${randomPart}`
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
+    const nextStatus = 'Open'
+    const ticketId = generateTicketId()
     const newTicket = {
-      id: generateTicketId(),
+      id: ticketId,
       ...formData,
-      status: 'Open',
+      status: nextStatus,
       createdAt: new Date().toLocaleString(),
     }
 
-    setTickets((current) => [newTicket, ...current])
-    setFormData(createInitialForm())
+    try {
+      const { error } = await supabase.from('tickets').insert({
+        ticket_id: ticketId,
+        name: formData.name,
+        email: formData.email,
+        category: formData.category,
+        priority: formData.priority,
+        subject: formData.subject,
+        description: formData.description,
+        status: nextStatus,
+      })
+
+      if (error) throw error
+
+      setTickets((current) => [newTicket, ...current])
+      setFormData(createInitialForm())
+    } catch (err) {
+      console.error('Failed to insert ticket:', err)
+      alert('Failed to submit ticket. Please try again.')
+    }
   }
 
   const updateTicketStatus = (ticketId, nextStatus) => {
@@ -139,6 +215,9 @@ function App() {
               name="description"
               value={formData.description}
               onChange={handleFieldChange}
+              onBlur={(event) => {
+                void suggestPriorityFromDescription(event.target.value)
+              }}
               rows={4}
               placeholder="Provide details, error messages, and steps already tried."
             />
